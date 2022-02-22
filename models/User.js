@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcrypt');
+const saltRounds = 10;
 
 const bookSchema = mongoose.Schema({
     name: {
@@ -25,7 +27,8 @@ const userSchema = mongoose.Schema({
     },
     password: {
         type: String,
-        minlength: 8
+        minlength: 8,
+        maxlength: 30
     },
     books: [
         bookSchema
@@ -38,6 +41,25 @@ const userSchema = mongoose.Schema({
     },
     tokenExp: {
         type: Number
+    }
+});
+
+userSchema.pre('save', function(next){
+    let user = this;
+
+    if(user.isModified('password')) {
+        bcrypt.genSalt(saltRounds, function(err, salt){
+            if(err) {
+                return next(err);
+            }
+            bcrypt.hash(user.password, salt, function(err, hash) {
+                if(err) {
+                    return next(err);
+                }
+                user.password = hash;
+                next();
+            })
+        })
     }
 });
 

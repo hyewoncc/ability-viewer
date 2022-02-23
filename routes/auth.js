@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const api = require('../config/api');
 
 const { User } = require('../models/User');
 
@@ -32,7 +33,7 @@ router.post('/', (req, res) => {
                     .json({
                       id: user.id,
                       links: {
-                        user: '/users/' + user.id
+                        user: api.url + 'users/' + user.id
                       }
                     });
         })

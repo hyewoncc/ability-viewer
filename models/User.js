@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 const saltRounds = 10;
+const jwt = require('jsonwebtoken');
 
 const bookSchema = mongoose.Schema({
     name: {
@@ -26,9 +27,7 @@ const userSchema = mongoose.Schema({
         trim: true
     },
     password: {
-        type: String,
-        minlength: 8,
-        maxlength: 30
+        type: String
     },
     books: [
         bookSchema
@@ -72,6 +71,18 @@ userSchema.methods.comparePassword = function(plainPassword, cb) {
         }
         cb(null, isMatch)
     })
+}
+
+userSchema.methods.generateToken = function(cb) {
+    let user = this;
+    let token = jwt.sign(user._id.toHexString(), 'loginToken');
+    user.token = token;
+    user.save(function(err, user) {
+        if(err) {
+            return cb(err)
+        }
+        cb(null, user);
+    });
 }
 
 const User = mongoose.model('User', userSchema);

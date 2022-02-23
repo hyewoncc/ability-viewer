@@ -19,7 +19,23 @@ router.post('/', (req, res) => {
             message: "Unregistred id or invalid password"
           });
         }
-        return res.status(200).json({});
+
+        user.generateToken((err, user) => {
+          if(err) {
+            return res.status(500).json({
+              loginSuccess: false,
+              message: "Server method failed"
+            });
+          }
+          return res.cookie("_auth", user.token)
+                    .status(200)
+                    .json({
+                      id: user.id,
+                      links: {
+                        user: '/users/' + user.id
+                      }
+                    });
+        })
       })
     })
 });

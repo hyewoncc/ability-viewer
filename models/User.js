@@ -20,10 +20,17 @@ const tagSchema = mongoose.Schema({
 const userSchema = mongoose.Schema({
     id: {
         type: String,
-        maxlength: 20
+        maxlength: 20,
+        trim: true,
+        unique: true
     },
     email: {
         type: String,
+        trim: true
+    },
+    name: {
+        type: String,
+        maxlength: 20,
         trim: true
     },
     password: {

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const api = require('../config/api');
 
+const { auth } = require('../middleware/auth');
 const { User } = require('../models/User');
 
 router.get('/', function(req, res, next) {
@@ -34,7 +35,7 @@ router.post('/login', (req, res) => {
             message: "Server method failed"
           });
         }
-        return res.cookie("_auth", user.token)
+        return res.cookie("ability_auth", user.token)
                   .status(200)
                   .json({
                     id: user.id,
@@ -46,5 +47,20 @@ router.post('/login', (req, res) => {
     })
   })
 });
+
+router.post('/logout', auth, (req, res) => {
+  User.findOneAndUpdate({ _id: req.user._id},{ token: "" }, (err, user) => {
+    if(err) {
+      return res.status(500).json({
+        logoutSuccess: false,
+        message: "Server method failed"
+      })
+    }
+    res.clearCookie('ability_auth');
+    return res.status(200).json({
+      logoutSuccess: true
+    })
+  })
+})
 
 module.exports = router;

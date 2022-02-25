@@ -14,8 +14,8 @@ router.post('/', function(req, res, next) {
   const user = new User(req.body);
   user.save((err, userInfo) => {
     if(err) {
-      return res.json({ 
-        success: false, err
+      return res.status(500).json({ 
+        message: "Server method failed"
       })
     }
     return res.status(201).json({

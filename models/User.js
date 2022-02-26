@@ -4,11 +4,14 @@ const saltRounds = 10;
 const jwt = require('jsonwebtoken');
 
 const bookSchema = mongoose.Schema({
+    _id: {
+        type: Object
+    },
     name: {
         type: String,
         maxlength: 100
     }
-})
+},{ timestamps: true })
 
 const tagSchema = mongoose.Schema({
     name: {
@@ -90,6 +93,23 @@ userSchema.methods.generateToken = function(cb) {
         }
         cb(null, user);
     });
+}
+
+userSchema.methods.saveBook = function(book, cb) {
+    let user = this;
+    let token = req.cookies.ability_auth;
+
+    this.findByToken(token, (err, user) => {
+        if(err) {
+            return cb(err);
+        }
+        user.books.push(book, function(err) {
+            if(err) {
+                return cb(err)
+            }
+            cb(null, user);
+        })
+    })
 }
 
 userSchema.statics.findByToken = function(token, cb) {

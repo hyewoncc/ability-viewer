@@ -6,6 +6,26 @@ const { auth } = require('../middleware/auth');
 const { Book } = require('../models/Book');
 const { User } = require('../models/User');
 
+router.get('/:_id', auth, function(req, res) {
+    Book.findById(req.params._id, function(err, book) {
+        if(err) {
+            return res.status(500).json({
+              message: "Server method failed",
+              method: "DB - find a book"
+            })
+        }
+        return res.status(200).json({
+            name: book.name,
+            text: book.text,
+            tags: book.tags,
+            links: {
+                update: api.url + 'books/' + book._id,
+                delete: api.url + 'books/' + book._id
+            }
+        })
+    })
+})
+
 router.post('/', auth, function(req, res, next) {
     const book = new Book(req.body);
     book.save((err, bookInfo) => {

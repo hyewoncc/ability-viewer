@@ -34,7 +34,7 @@ router.post('/', auth, function(req, res, next) {
                 message: "Server method failed"
             })
         }
-        User.findOne({ id: req.user.id }, (err, user) => {
+        User.findOne({ _id: req.user._id }, (err, user) => {
             user.books.push(book);
             user.save((err) => {
                 if(err) {

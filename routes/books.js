@@ -10,8 +10,7 @@ router.get('/:_id', auth, function(req, res) {
     Book.findById(req.params._id, function(err, book) {
         if(err) {
             return res.status(500).json({
-              message: "Server method failed",
-              method: "DB - find a book"
+              message: "Server method failed"
             })
         }
         return res.status(200).json({
@@ -49,5 +48,28 @@ router.post('/', auth, function(req, res, next) {
         })
     })
 })
+
+router.delete('/:_id', auth, function(req, res){
+    Book.findByIdAndDelete(req.params._id, function(err, book) {
+        if(err) {
+            return res.status(500).json({
+              message: "Server method failed"
+            })
+        }
+        User.findByIdAndUpdate(
+            { _id: req.user._id },
+            { $pull: { books: { _id: book._id }}},
+            function(err, user) {
+                if(err) {
+                    return res.status(500).json({
+                      message: "Server method failed"
+                    })
+                }
+        })
+        return res.status(200).json({
+            success: true
+        })
+    })
+});
 
 module.exports = router;

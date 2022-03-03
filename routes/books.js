@@ -6,6 +6,22 @@ const { auth } = require('../middleware/auth');
 const { Book } = require('../models/Book');
 const { User } = require('../models/User');
 
+router.get('/', auth, function(req, res) {
+    const userId = req.query.id;
+    User.findOne({ "id:": userId }, function(err, user) {
+        const books = user.books.toObject();
+        books.forEach(book => {
+            book.links = {
+                book: api.url + 'books/' + book._id,
+                delete: api.url + 'books/' + book._id
+            }
+        });
+        return res.status(200).json({
+            books: books
+        })
+    });
+})
+
 router.get('/:_id', auth, function(req, res) {
     Book.findById(req.params._id, function(err, book) {
         if(err) {

@@ -52,6 +52,18 @@ router.post('/', auth, async(req, res, next) => {
             const user = await User.findOne({ _id: req.user._id });
             user.books.push(book);
             let tagcount = 0;
+            if(tags.length === 0) {
+                user.save((err) => {
+                    if (err) {
+                        return res.status(500).json({
+                            message: "Server method failed"
+                        })
+                    }
+                    return res.status(201).json({
+                        success: true
+                    })
+                })
+            }
             for(const tagInfo of tags) {
                 try {
                     const userAlreadyHaveTag = await User.find({ _id: user._id, 'tags' : {'$elemMatch' : {'name': tagInfo.name}}});

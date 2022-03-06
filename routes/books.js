@@ -142,27 +142,73 @@ router.post('/', auth, async(req, res, next) => {
     }
 })
 
-router.delete('/:_id', auth, function(req, res){
-    Book.findByIdAndDelete(req.params._id, function(err, book) {
-        if(err) {
-            return res.status(500).json({
-              message: "Server method failed"
-            })
-        }
-        User.findByIdAndUpdate(
-            { _id: req.user._id },
-            { $pull: { books: { _id: book._id }}},
-            function(err, user) {
-                if(err) {
+router.delete('/:_id', auth, async(req, res) => {
+    try {
+        const deletedBook = await Book.findByIdAndDelete(req.params._id);
+        try {
+            const targetuser = await User.findByIdAndUpdate({ _id: req.user._id },{ $pull: { books: { _id: deletedBook._id }}});
+            for(const targetTag of deletedBook.tags) {
+                try {
+                    const tag = await Tag.findById(targetTag._id);
+                    if (tag.books.length === 1) {
+                        try {
+                            const deletedTag = await tag.delete();
+                            try {
+                                const targetUserToPullTag = await User.findByIdAndUpdate(
+                                    { _id: targetuser._id }, { $pull: { tags: { _id: deletedTag._id }}});
+                            } catch(err) {
+                                return res.status(500).json({
+                                    message: "Server method failed"
+                                })
+                            }
+                        } catch(err) {
+                            return res.status(500).json({
+                                message: "Server method failed"
+                            })
+                        }
+                        tag.delete((err) => {
+                            if(err) {
+                                console.log(err);
+                                return res.status(500).json({
+                                    message: "Server method failed"
+                                })
+                            }
+                        })
+                    } else {
+                        try {
+                            const updatedTag = await Tag.findByIdAndUpdate(
+                                { _id: targetTag._id },
+                                { $pull: { books: { _id: deletedBook._id }}}
+                            )
+                        } catch (err) {
+                            console.log(err);
+                            return res.status(500).json({
+                                message: "Server method failed"
+                            })
+                        }
+                    }
+                } catch (err) {
+                    console.log(err);
                     return res.status(500).json({
-                      message: "Server method failed"
+                        message: "Server method failed"
                     })
                 }
-        })
-        return res.status(200).json({
+            }
+        } catch(err) {
+            console.log(err);
+            return res.status(500).json({
+                message: "Server method failed"
+            })
+        }
+        return res.status(201).json({
             success: true
         })
-    })
+    } catch(err) {
+        console.log(err);
+        return res.status(500).json({
+            message: "Server method failed"
+        })
+    }
 });
 
 module.exports = router;

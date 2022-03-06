@@ -9,19 +9,47 @@ const { Tag } = require('../models/Tag');
 const { User } = require('../models/User');
 
 router.get('/', auth, function(req, res) {
-    const userId = req.query.id;
-    User.findOne({ "id:": userId }, function(err, user) {
-        const books = user.books.toObject();
-        books.forEach(book => {
-            book.links = {
-                book: api.url + 'books/' + book._id,
-                delete: api.url + 'books/' + book._id
+    const userId = req.user._id;
+    const tagId = req.query.tag;
+    if (tagId) {
+        Tag.findById(tagId, function(err, tag) {
+            if(err) {
+                return res.status(500).json({
+                    message: "Server method failed"
+                  })
             }
-        });
-        return res.status(200).json({
-            books: books
+            const booksInTag = tag.books.toObject();
+            booksInTag.forEach(book => {
+                book.links = {
+                    book: api.url + 'books/' + book._id,
+                    delete: api.url + 'books/' + book._id
+                };
+                delete(book._id);
+            });
+            return res.status(200).json({
+                books: booksInTag
+            })
         })
-    });
+    }else {
+        User.findById(userId, function(err, user) {
+            if(err) {
+                return res.status(500).json({
+                    message: "Server method failed"
+                  })
+            }
+            const booksInUser = user.books.toObject();
+            booksInUser.forEach(book => {
+                book.links = {
+                    book: api.url + 'books/' + book._id,
+                    delete: api.url + 'books/' + book._id
+                };
+                delete(book._id);
+            });
+            return res.status(200).json({
+                books: booksInUser
+            })
+        });
+    }
 })
 
 router.get('/:_id', auth, function(req, res) {

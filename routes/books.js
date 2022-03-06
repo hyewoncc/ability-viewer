@@ -1,9 +1,11 @@
 const express = require('express');
+const res = require('express/lib/response');
 const router = express.Router();
 const api = require('../config/api');
 
 const { auth } = require('../middleware/auth');
 const { Book } = require('../models/Book');
+const { Tag } = require('../models/Tag');
 const { User } = require('../models/User');
 
 router.get('/', auth, function(req, res) {
@@ -41,28 +43,91 @@ router.get('/:_id', auth, function(req, res) {
     })
 })
 
-router.post('/', auth, function(req, res, next) {
-    const book = new Book(req.body);
-    book.save((err, bookInfo) => {
-        if(err) {
-            return res.status(500).json({
-                message: "Server method failed"
-            })
-        }
-        User.findOne({ _id: req.user._id }, (err, user) => {
+router.post('/', auth, async(req, res, next) => {
+    const book = new Book(req.body.book);
+    const tags = req.body.tags;
+    try {
+        const bookInfo = await book.save();
+        try {
+            const user = await User.findOne({ _id: req.user._id });
             user.books.push(book);
-            user.save((err) => {
-                if(err) {
+            let tagcount = 0;
+            for(const tagInfo of tags) {
+                try {
+                    const userAlreadyHaveTag = await User.find({ _id: user._id, 'tags' : {'$elemMatch' : {'name': tagInfo.name}}});
+                    if (!userAlreadyHaveTag.length) {
+                        const tag = new Tag(tagInfo);
+                        tag.books.push(book);
+                        tag.user_id = user._id;
+                        try {
+                            const newTag = await tag.save();
+                            book.tags.push(tag);
+                            user.tags.push(tag);
+                        }catch(err) {
+                            return res.status(500).json({
+                                message: "Server method failed"
+                            })
+                        }
+                    }else{
+                        try {
+                            const existTag = await Tag.find({user_id: user._id, name: tagInfo.name});
+                            existTag[0].books.push(book);
+                            book.tags.push({
+                                name: existTag[0].name,
+                                _id: existTag[0]._id
+                            });
+                            try {
+                                const saveExistTag = await existTag[0].save();
+                            } catch(err) {
+                                return res.status(500).json({
+                                    message: "Server method failed"
+                                })
+                            }
+                        } catch (err) {
+                            return res.status(500).json({
+                                message: "Server method failed"
+                            })
+                        }
+                    }
+                    tagcount += 1;
+                    if(tagcount === tags.length) {
+                        book.save((err) => {
+                            if (err) {
+                                return res.status(500).json({
+                                    message: "Server method failed"
+                                })
+                            }
+                            user.save((err) => {
+                                if (err) {
+                                    return res.status(500).json({
+                                        message: "Server method failed"
+                                    })
+                                }
+                                return res.status(201).json({
+                                    success: true
+                                })
+                            })
+                        })
+                    } 
+                } catch(err) {
+                    console.log(err);
                     return res.status(500).json({
                         message: "Server method failed"
                     })
                 }
+            }
+        }catch(err) {
+            console.log(err);
+            return res.status(500).json({
+                message: "Server method failed"
             })
+        }
+    }catch (err) {
+        console.log(err);
+        return res.status(500).json({
+            message: "Server method failed"
         })
-        return res.status(201).json({
-            success: true
-        })
-    })
+    }
 })
 
 router.delete('/:_id', auth, function(req, res){

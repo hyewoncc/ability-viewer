@@ -40,7 +40,7 @@ router.post('/login', (req, res) => {
                   .json({
                     id: user.id,
                     links: {
-                      user: api.url + 'users/' + user.id
+                      user: api.url + 'users'
                     }
                   });
       })

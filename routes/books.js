@@ -183,29 +183,33 @@ router.patch('/:_id', auth, async(req, res) => {
         const preserveTags = [];
         const pullTagsId = [];
 
-        // 기존 : [아이돌, 현대, 전체]
-        // 수정 : [아이돌, 현대, bl, 수위]
         for (const existTag of targetBook.tags) {
-            // 기존 태그가 수정 태그에 있는지 확인
             let matchTag = updateTags.filter(tag => tag.name === existTag.name);
-
-            // 존재하지 않음 -> pullTagsId로 _id만
             if (matchTag.length === 0) {
                 pullTagsId.push(existTag._id);
+            }else {
+                preserveTags.push(existTag);
             }
         }
 
-        // 존재하지 않는 태그들을 book 에서 삭제
-        console.log(pullTagsId);
+        for (const preserveTag of preserveTags) {
+            const updateTagResult = await Tag.findOneAndUpdate(
+                { _id: preserveTag._id, "books._id": targetBook._id },
+                { $set: { "books.$.name": targetBook.name }}
+            );
+        }
+
+        const updateUserResult = await User.findOneAndUpdate(
+            { _id: user._id, "books._id": targetBook._id },
+            { $set: { "books.$.name": targetBook.name }}
+        );
+
         const tagPulledBook = await Book.findByIdAndUpdate(
             { _id: targetBook._id }, 
             { $pull: { tags: { _id: { $in: pullTagsId}}}}
         );
 
-        // 기존 : [아이돌, 현대, 전체]
-        // 수정 : [아이돌, 현대, bl, 수위]
         for (const updateTag of updateTags) {
-            // 수정 태그 중 기존 태그에 없던 것을 찾음
             let isExist = false;
             for (const oldTag of targetBook.tags ) {
                 if (updateTag.name === oldTag.name) {
@@ -213,10 +217,9 @@ router.patch('/:_id', auth, async(req, res) => {
                 }
             }
 
-            // 새로운 태그라면 실행
             if (!isExist) {
-                const originTag = await Tag.exists({user_id: user._id, name: updateTag.name});
-                if (!originTag) {
+                const originTagExist = await Tag.exists({user_id: user._id, name: updateTag.name});
+                if (!originTagExist) {
                     const tag = new Tag(updateTag);
                     tag.books.push(targetBook);
                     tag.user_id = user._id;
@@ -224,11 +227,15 @@ router.patch('/:_id', auth, async(req, res) => {
                     const newTag = await tag.save();
                     targetBook.tags.push(newTag);
                     user.tags.push(newTag);
+                } else {
+                    const originTag = await Tag.findOne({user_id: user._id, name: updateTag.name});
+                    originTag.books.push(targetBook);
+                    const updatedOriginTag = await originTag.save();
+                    targetBook.tags.push(originTag);
                 }
             }
         }
 
-        // 삭제된 태그들에 이 책이 유일하다면 태그 삭제
         for (const pullTagId of pullTagsId) {
             const tag = await Tag.findById(pullTagId);
             if (tag.books.length === 1) {

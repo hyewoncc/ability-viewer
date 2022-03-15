@@ -7,17 +7,18 @@ const { Book } = require('../models/Book');
 const { Tag } = require('../models/Tag');
 const { User } = require('../models/User');
 
-router.get('/', auth, function(req, res) {
+router.get('/', auth, async(req, res) => {
+    /*
+    ** 쿼리 파라미터로 태그 id가 존재한다면 태그 기반 검색
+    ** 없다면 사용자의 모든 책 검색 
+    */
     const userId = req.user._id;
     const tagId = req.query.tag;
-    if (tagId) {
-        Tag.findById(tagId, function(err, tag) {
-            if(err) {
-                return res.status(500).json({
-                    message: "Server method failed"
-                  })
-            }
-            const booksInTag = tag.books.toObject();
+    
+    try {
+        if (tagId) {
+            const targetTag =  await Tag.findById(tagId);
+            const booksInTag = targetTag.books.toObject();
             booksInTag.forEach(book => {
                 book.links = {
                     book: api.url + 'books/' + book._id,
@@ -28,15 +29,9 @@ router.get('/', auth, function(req, res) {
             return res.status(200).json({
                 books: booksInTag
             })
-        })
-    }else {
-        User.findById(userId, function(err, user) {
-            if(err) {
-                return res.status(500).json({
-                    message: "Server method failed"
-                  })
-            }
-            const booksInUser = user.books.toObject();
+        }else {
+            const targetUser = await User.findById(userId);
+            const booksInUser = targetUser.books.toObject();
             booksInUser.forEach(book => {
                 book.links = {
                     book: api.url + 'books/' + book._id,
@@ -47,7 +42,13 @@ router.get('/', auth, function(req, res) {
             return res.status(200).json({
                 books: booksInUser
             })
-        });
+        }
+        
+    } catch(err) {
+        console.log(err);
+        return res.status(500).json({
+            message: "Server method failed"
+        })
     }
 })
 
@@ -73,96 +74,58 @@ router.get('/:_id', auth, function(req, res) {
 router.post('/', auth, async(req, res, next) => {
     const book = new Book(req.body.book);
     const tags = req.body.tags;
+
     try {
-        const bookInfo = await book.save();
-        try {
-            const user = await User.findOne({ _id: req.user._id });
-            user.books.push(book);
-            let tagcount = 0;
-            if(tags.length === 0) {
-                user.save((err) => {
-                    if (err) {
-                        return res.status(500).json({
-                            message: "Server method failed"
-                        })
-                    }
-                    return res.status(201).json({
-                        success: true
-                    })
-                })
-            }
-            for(const tagInfo of tags) {
-                try {
-                    const userAlreadyHaveTag = await User.find({ _id: user._id, 'tags' : {'$elemMatch' : {'name': tagInfo.name}}});
-                    if (!userAlreadyHaveTag.length) {
-                        const tag = new Tag(tagInfo);
-                        tag.books.push(book);
-                        tag.user_id = user._id;
-                        try {
-                            const newTag = await tag.save();
-                            book.tags.push(tag);
-                            user.tags.push(tag);
-                        }catch(err) {
-                            return res.status(500).json({
-                                message: "Server method failed"
-                            })
-                        }
-                    }else{
-                        try {
-                            const existTag = await Tag.find({user_id: user._id, name: tagInfo.name});
-                            existTag[0].books.push(book);
-                            book.tags.push({
-                                name: existTag[0].name,
-                                _id: existTag[0]._id
-                            });
-                            try {
-                                const saveExistTag = await existTag[0].save();
-                            } catch(err) {
-                                return res.status(500).json({
-                                    message: "Server method failed"
-                                })
-                            }
-                        } catch (err) {
-                            return res.status(500).json({
-                                message: "Server method failed"
-                            })
-                        }
-                    }
-                    tagcount += 1;
-                    if(tagcount === tags.length) {
-                        book.save((err) => {
-                            if (err) {
-                                return res.status(500).json({
-                                    message: "Server method failed"
-                                })
-                            }
-                            user.save((err) => {
-                                if (err) {
-                                    return res.status(500).json({
-                                        message: "Server method failed"
-                                    })
-                                }
-                                return res.status(201).json({
-                                    success: true
-                                })
-                            })
-                        })
-                    } 
-                } catch(err) {
-                    console.log(err);
-                    return res.status(500).json({
-                        message: "Server method failed"
-                    })
-                }
-            }
-        }catch(err) {
-            console.log(err);
-            return res.status(500).json({
-                message: "Server method failed"
+        await book.save();
+    
+        const user = await User.findOne({ _id: req.user._id });
+        user.books.push(book);
+
+        if(tags.length === 0) {
+            await user.save();
+            return res.status(201).json({
+                    success: true
             })
         }
-    }catch (err) {
-        console.log(err);
+
+        let tagcount = 0;
+
+        for(const tagInfo of tags) {
+            const userAlreadyHaveTag = await User.find(
+                { _id: user._id, 'tags' : {'$elemMatch' : {'name': tagInfo.name}}}
+            );
+            if (!userAlreadyHaveTag.length) {
+                const tag = new Tag(tagInfo);
+                tag.books.push(book);
+                tag.user_id = user._id;
+
+                await tag.save();
+                book.tags.push(tag);
+                user.tags.push(tag);
+
+            } else{
+                const existTag = await Tag.find({user_id: user._id, name: tagInfo.name});
+                existTag[0].books.push(book);
+                book.tags.push({
+                    name: existTag[0].name,
+                    _id: existTag[0]._id
+                });
+                await existTag[0].save();
+            }
+            tagcount += 1;
+        }
+        
+        
+        if(tagcount === tags.length) {
+            await book.save();
+            await user.save();
+
+            return res.status(201).json({
+                success: true
+            })
+        }
+
+    } catch(err) {
         return res.status(500).json({
             message: "Server method failed"
         })
@@ -172,14 +135,14 @@ router.post('/', auth, async(req, res, next) => {
 router.patch('/:_id', auth, async(req, res) => {
     try {
         const targetBook = await Book.findById(req.params._id);
-        const updateBook = req.body;
+        const updateBook = req.body.book;
 
         const user = await User.findById(req.user._id);
 
         targetBook.name = updateBook.name;
         targetBook.text = updateBook.text;
 
-        const updateTags = updateBook.tags;
+        const updateTags = req.body.tags;
         const preserveTags = [];
         const pullTagsId = [];
 
@@ -193,18 +156,18 @@ router.patch('/:_id', auth, async(req, res) => {
         }
 
         for (const preserveTag of preserveTags) {
-            const updateTagResult = await Tag.findOneAndUpdate(
+            await Tag.findOneAndUpdate(
                 { _id: preserveTag._id, "books._id": targetBook._id },
                 { $set: { "books.$.name": targetBook.name }}
             );
         }
 
-        const updateUserResult = await User.findOneAndUpdate(
+        await User.findOneAndUpdate(
             { _id: user._id, "books._id": targetBook._id },
             { $set: { "books.$.name": targetBook.name }}
         );
 
-        const tagPulledBook = await Book.findByIdAndUpdate(
+        await Book.findByIdAndUpdate(
             { _id: targetBook._id }, 
             { $pull: { tags: { _id: { $in: pullTagsId}}}}
         );
@@ -230,7 +193,7 @@ router.patch('/:_id', auth, async(req, res) => {
                 } else {
                     const originTag = await Tag.findOne({user_id: user._id, name: updateTag.name});
                     originTag.books.push(targetBook);
-                    const updatedOriginTag = await originTag.save();
+                    await originTag.save();
                     targetBook.tags.push(originTag);
                 }
             }
@@ -239,35 +202,26 @@ router.patch('/:_id', auth, async(req, res) => {
         for (const pullTagId of pullTagsId) {
             const tag = await Tag.findById(pullTagId);
             if (tag.books.length === 1) {
-                const deleteResult = await tag.delete();
-                const tagPulledUser = await User.findByIdAndUpdate(
+                await tag.delete();
+                await User.findByIdAndUpdate(
                         { _id: user._id },
                         { $pull: { tags: { _id: tag._id }}}
                     );
             } else {
-                const updatedTag = await Tag.findByIdAndUpdate(
+                await Tag.findByIdAndUpdate(
                     { _id: pullTagId },
                     { $pull: { books: { _id: targetBook._id }}}
                 )
             }
         }
-        
-        targetBook.save((err) => {
-            if(err) {
-                return res.status(500).json({
-                    message: "Server method failed"
-                })
-            }
+
+        await targetBook.save();
+        await user.save();
+
+        return res.status(200).json({
+            success: true
         })
 
-        user.save((err) => {
-            if(err) {
-                return res.status(500).json({
-                    message: "Server method failed"
-                })
-            }
-        })
-        
     }catch (err) {
         console.log(err);
         return res.status(500).json({
@@ -275,74 +229,35 @@ router.patch('/:_id', auth, async(req, res) => {
         })
     }
     
-    return res.status(200).json({
-        success: true
-    })
 })
 
 router.delete('/:_id', auth, async(req, res) => {
     try {
         const deletedBook = await Book.findByIdAndDelete(req.params._id);
-        try {
-            const targetuser = await User.findByIdAndUpdate({ _id: req.user._id },{ $pull: { books: { _id: deletedBook._id }}});
-            for(const targetTag of deletedBook.tags) {
-                try {
-                    const tag = await Tag.findById(targetTag._id);
-                    if (tag.books.length === 1) {
-                        try {
-                            const deletedTag = await tag.delete();
-                            try {
-                                const targetUserToPullTag = await User.findByIdAndUpdate(
-                                    { _id: targetuser._id }, { $pull: { tags: { _id: deletedTag._id }}});
-                            } catch(err) {
-                                return res.status(500).json({
-                                    message: "Server method failed"
-                                })
-                            }
-                        } catch(err) {
-                            return res.status(500).json({
-                                message: "Server method failed"
-                            })
-                        }
-                        tag.delete((err) => {
-                            if(err) {
-                                console.log(err);
-                                return res.status(500).json({
-                                    message: "Server method failed"
-                                })
-                            }
-                        })
-                    } else {
-                        try {
-                            const updatedTag = await Tag.findByIdAndUpdate(
-                                { _id: targetTag._id },
-                                { $pull: { books: { _id: deletedBook._id }}}
-                            )
-                        } catch (err) {
-                            console.log(err);
-                            return res.status(500).json({
-                                message: "Server method failed"
-                            })
-                        }
-                    }
-                } catch (err) {
-                    console.log(err);
-                    return res.status(500).json({
-                        message: "Server method failed"
-                    })
-                }
+        const targetuser = await User.findByIdAndUpdate({ _id: req.user._id },{ $pull: { books: { _id: deletedBook._id }}});
+
+        for(const targetTag of deletedBook.tags) {
+            const tag = await Tag.findById(targetTag._id);
+            if (tag.books.length === 1) {
+                const deletedTag = await tag.delete();
+                await User.findByIdAndUpdate(
+                    { _id: targetuser._id }, { $pull: { tags: { _id: deletedTag._id }}}
+                );
+            } else {
+                await Tag.findByIdAndUpdate(
+                    { _id: targetTag._id },
+                    { $pull: { books: { _id: deletedBook._id }}}
+                );
+
+
             }
-        } catch(err) {
-            console.log(err);
-            return res.status(500).json({
-                message: "Server method failed"
-            })
         }
-        return res.status(201).json({
+
+        return res.status(200).json ({
             success: true
         })
-    } catch(err) {
-        console.log(err);
+        
+    }catch(err) {
         return res.status(500).json({
             message: "Server method failed"
         })

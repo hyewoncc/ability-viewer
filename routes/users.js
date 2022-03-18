@@ -27,7 +27,7 @@ router.get('/', auth, function(req, res, next) {
 });
 
 router.post('/', function(req, res, next) {
-    const user = new User(req.body);
+    const user = new User(req.body.user);
     user.save((err, userInfo) => {
         if(err) {
             return res.status(500).json({ 

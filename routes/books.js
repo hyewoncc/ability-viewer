@@ -59,14 +59,21 @@ router.get('/:_id', auth, function(req, res) {
               message: "Server method failed"
             })
         }
+        const tags = book.tags.toObject();
+        tags.forEach(tag => {
+            delete(tag._id);
+        });
         return res.status(200).json({
-            name: book.name,
-            text: book.text,
-            tags: book.tags,
-            links: {
-                update: api.url + 'books/' + book._id,
-                delete: api.url + 'books/' + book._id
+            book: {
+                name: book.name,
+                text: book.text,
+                tags: tags,
+                links: {
+                    update: api.url + 'books/' + book._id,
+                    delete: api.url + 'books/' + book._id
+                }
             }
+            
         })
     })
 })

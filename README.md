@@ -1,5 +1,5 @@
 # 📖 Ability-viewer
-`Ability`는 프론트엔드 2명, 백엔드 1명이 모여 만든 웹소설 뷰어입니다  
+`Ability`는 프론트엔드 2명, 백엔드 1명이 만든 웹소설 뷰어입니다  
 
 <br/>
 
@@ -16,6 +16,9 @@
 ### API 문서  
 [Ability API](https://magical-tick-0a1.notion.site/Ability-API-13c59de8a48f4d0e8bc049207bb2d5a3)
 
+<br/>
 
+### 프론트 레포  
+[Ability](https://github.com/crain7326/Ability-viewer)  
 
 

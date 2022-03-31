@@ -35,9 +35,9 @@ router.post('/login', (req, res) => {
             message: "Server method failed"
           });
         }
-        return res.cookie("ability_auth", user.token)
-                  .status(200)
+        return res.status(200)
                   .json({
+                    token: user.token,
                     id: user.id,
                     links: {
                       user: api.url + 'users'

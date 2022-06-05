@@ -17,17 +17,30 @@ router.get('/', auth, async(req, res) => {
     
     try {
         if (tagId) {
-            const targetTag =  await Tag.findById(tagId);
-            const booksInTag = targetTag.books.toObject();
+            const booksInTag = await Book.find (
+                { "tags._id": tagId }
+            );
+            const responseBooks = [];
             booksInTag.forEach(book => {
+                responseBooks.push(book.toObject());
+            });
+
+            responseBooks.forEach(book => {
                 book.links = {
                     book: api.url + 'books/' + book._id,
                     delete: api.url + 'books/' + book._id
                 };
+                book.tags.forEach(tag => {
+                    tag.links = {
+                        books: api.url + 'books?tag=' + tag._id
+                    };
+                    delete(tag._id);
+                });
                 delete(book._id);
+                delete(book.__v);
             });
             return res.status(200).json({
-                books: booksInTag
+                books: responseBooks
             })
         }else {
             const targetUser = await User.findById(userId);
@@ -37,6 +50,12 @@ router.get('/', auth, async(req, res) => {
                     book: api.url + 'books/' + book._id,
                     delete: api.url + 'books/' + book._id
                 };
+                book.tags.forEach(tag => {
+                    tag.links = {
+                        books: api.url + 'books?tag=' + tag._id
+                    };
+                    delete(tag._id);
+                });
                 delete(book._id);
             });
             return res.status(200).json({
@@ -86,9 +105,9 @@ router.post('/', auth, async(req, res, next) => {
         await book.save();
     
         const user = await User.findOne({ _id: req.user._id });
-        user.books.push(book);
 
         if(tags.length === 0) {
+            user.books.push(book);
             await user.save();
             return res.status(201).json({
                     success: true
@@ -110,12 +129,12 @@ router.post('/', auth, async(req, res, next) => {
                 book.tags.push(tag);
                 user.tags.push(tag);
 
-            } else{
+            } else {
                 const existTag = await Tag.find({user_id: user._id, name: tagInfo.name});
                 existTag[0].books.push(book);
                 book.tags.push({
-                    name: existTag[0].name,
-                    _id: existTag[0]._id
+                    _id: existTag[0]._id,
+                    name: existTag[0].name
                 });
                 await existTag[0].save();
             }
@@ -124,6 +143,7 @@ router.post('/', auth, async(req, res, next) => {
         
         
         if(tagcount === tags.length) {
+            user.books.push(book);
             await book.save();
             await user.save();
 
@@ -223,6 +243,14 @@ router.patch('/:_id', auth, async(req, res) => {
         }
 
         await targetBook.save();
+
+        const savedBook = await Book.findById(targetBook._id);
+
+        await User.findOneAndUpdate(
+            { _id: user._id, "books._id": savedBook._id },
+            { $set: { "books.$.tags": savedBook.tags }}
+        );
+
         await user.save();
 
         return res.status(200).json({

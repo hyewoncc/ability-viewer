@@ -4,6 +4,16 @@ const saltRounds = 10;
 const jwt = require('jsonwebtoken');
 const key = require('../config/key'); 
 
+const tagSchema = mongoose.Schema({
+    _id: {
+        type: Object
+    },
+    name: {
+        type: String,
+        maxlength: 50
+    }
+})
+
 const bookSchema = mongoose.Schema({
     _id: {
         type: Object
@@ -11,15 +21,11 @@ const bookSchema = mongoose.Schema({
     name: {
         type: String,
         maxlength: 100
-    }
+    },
+    tags: [
+        tagSchema
+    ]
 },{ timestamps: true })
-
-const tagSchema = mongoose.Schema({
-    name: {
-        type: String,
-        maxlength: 50
-    }
-})
 
 const userSchema = mongoose.Schema({
     id: {
